@@ -24,12 +24,24 @@ import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 final String TAG ="lifecycle";
+    List<User> getusersList;
+    List<User> usersgetall;
 Button button,button_load,button_save,button_auth,button_change;
     Intent intent;
     Boolean authorization;
     Toast toast,auth,change;
     DatabaseHandler db = new DatabaseHandler(this);
+    private void handleAuthorization(List<User> usersList) {
+        authorization = !usersList.isEmpty();
 
+        if (authorization) {
+            auth = Toast.makeText(MainActivity.this, "Вы успешно авторизовались", Toast.LENGTH_SHORT);
+            auth.setGravity(Gravity.TOP, 0, 160);
+            auth.show();
+        } else {
+            Toast.makeText(MainActivity.this, "Ошибка авторизации", Toast.LENGTH_SHORT).show();
+        }
+    }
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         authorization=false;
@@ -50,7 +62,7 @@ Button button,button_load,button_save,button_auth,button_change;
                 String password=Password.getText().toString();
 
                 intent.putExtra("login", login);
-                if (authorization==true)
+                if (authorization)
                 startActivity(intent);
                 authorization=false;
             }
@@ -59,24 +71,37 @@ Button button,button_load,button_save,button_auth,button_change;
         button_auth.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                List<User> usersList = new ArrayList<User>();
-                usersList=db.getUsers(new User(Login.getText().toString(), Password.getText().toString()));
-                authorization=true;
-                if (usersList.isEmpty()){
-                    authorization=false;
-                };
-                if (authorization==true){
-                    auth = Toast.makeText(MainActivity.this,"Вы успешно авторизовались" ,Toast.LENGTH_SHORT);
-                    auth.setGravity(Gravity.TOP, 0,160);
-                    auth.show();
-                };
+               getusersList = new ArrayList<User>();
+
+                Thread thread = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        getusersList = db.getUsers(new User(Login.getText().toString(), Password.getText().toString()));
+
+                        // После завершения запроса, выполните действия в основном потоке
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                handleAuthorization(getusersList);
+                            }
+                        });
+                    }
+                });
+
+                thread.start();
             }
         });
+
         button_change.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (authorization==true){
-                    db.ChangePassword(new User(Login.getText().toString(), Password.getText().toString()));
+                if (authorization){
+                    new Thread(new Runnable() {
+@Override
+public void run() {
+    db.ChangePassword(new User(Login.getText().toString(), Password.getText().toString()));
+}
+}).start();
                     change = Toast.makeText(MainActivity.this,"Пароль изменён" ,Toast.LENGTH_SHORT);
                     change.setGravity(Gravity.TOP, 0,160);
                     change.show();
@@ -86,23 +111,36 @@ Button button,button_load,button_save,button_auth,button_change;
         button_load.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                List<User> users = db.getAllUsers();
-                for (User usr : users) {
-                    String log = "Id: "+usr.getID()+" ,Login: " + usr.getLogin() + " ,Password: " + usr.getPass();
-                    toast = Toast.makeText(MainActivity.this,log ,Toast.LENGTH_SHORT);
-                    toast.setGravity(Gravity.TOP, 0,160);
-                    toast.show();
-                    Log.v("Loading...", log);
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        usersgetall = db.getAllUsers();
 
-                }
-
-
+                        // Выполнить действия с данными в основном потоке после их загрузки
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                for (User usr : usersgetall) {
+                                    String log = "Id: "+usr.getID()+" ,Login: " + usr.getLogin() + " ,Password: " + usr.getPass();
+                                    toast = Toast.makeText(MainActivity.this,log ,Toast.LENGTH_SHORT);
+                                    toast.setGravity(Gravity.TOP, 0,160);
+                                    toast.show();
+                                    Log.v("Loading...", log);
+                                }
+                            }
+                        });
+                    }
+                }).start();
             }
         });
         button_save.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                db.addUser(new User(Login.getText().toString(), Password.getText().toString()));
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        db.addUser(new User(Login.getText().toString(), Password.getText().toString()));
+                    }}).start();
             }
         });
         Log.d(TAG,"MainActivity создано");
